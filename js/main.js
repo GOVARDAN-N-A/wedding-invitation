@@ -193,11 +193,123 @@ for (let i = 0; i < N; i++) {
   pc.appendChild(el);
 }
 
-// ── IntersectionObserver reveal ───────────────────────────────────────────────
+// ── IntersectionObserver reveal + particle burst ─────────────────────────────
+function spawnBurst(count) {
+  const pc2 = document.getElementById('particles');
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.style.cssText = `
+      position:absolute;
+      left:${35 + Math.random()*30}vw;
+      top:${40 + Math.random()*20}vh;
+      font-size:${0.5 + Math.random()*0.8}rem;
+      opacity:0;
+      pointer-events:none;
+      animation: burstPop ${0.6 + Math.random()*0.8}s ease-out forwards;
+      animation-delay:${Math.random()*0.3}s;
+      --bx:${(Math.random()-0.5)*120}px;
+      --by:${-40 - Math.random()*80}px;
+    `;
+    el.textContent = ['✦','✧','🌸','❀','☽','✿'][Math.floor(Math.random()*6)];
+    pc2.appendChild(el);
+    setTimeout(() => el.remove(), 1500);
+  }
+}
+
 const io = new IntersectionObserver((entries) => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const inHero = e.target.closest('.s-hero');
+      if (inHero && !inHero.classList.contains('entrance-active')) return;
+      e.target.classList.add('visible');
+      io.unobserve(e.target);
+      if (e.target.classList.contains('section-label')) spawnBurst(8);
+    }
+  });
 }, { threshold: 0.1, rootMargin: '0px 0px -4% 0px' });
 document.querySelectorAll('[class*="reveal"], .section-label').forEach(el => io.observe(el));
+
+function revealHeroContent() {
+  const hero = document.getElementById('s-hero');
+  if (!hero) return;
+  hero.querySelectorAll('[class*="reveal"], .section-label').forEach((el, i) => {
+    setTimeout(() => {
+      el.classList.add('visible');
+      if (el.classList.contains('section-label')) spawnBurst(8);
+    }, 500 + i * 120);
+  });
+}
+
+// ── Section entrance animations (doors / bloom / confetti) ───────────────────
+const CONFETTI_COLORS = ['#c8a96e', '#e8b8c8', '#fdf8e0', '#cc0000', '#f0d060', '#d4af70', '#e08080'];
+const confettiTriggered = new Set();
+
+function spawnConfetti(stage, count) {
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    const size = 6 + Math.random() * 8;
+    const isRect = Math.random() > 0.4;
+    el.style.cssText = `
+      left: ${Math.random() * 100}%;
+      width: ${isRect ? size : size * 0.6}px;
+      height: ${isRect ? size * 0.45 : size}px;
+      background: ${CONFETTI_COLORS[i % CONFETTI_COLORS.length]};
+      border-radius: ${isRect ? '1px' : '50%'};
+      animation-duration: ${2.2 + Math.random() * 2.8}s;
+      animation-delay: ${Math.random() * 1.2}s;
+      --spin: ${360 + Math.random() * 720}deg;
+      --tumble: ${180 + Math.random() * 540}deg;
+    `;
+    stage.appendChild(el);
+    setTimeout(() => el.remove(), 5500);
+  }
+}
+
+function triggerEntrance(section) {
+  const type = section.dataset.entrance;
+  if (!type || section.classList.contains('entrance-active')) return;
+
+  section.classList.add('entrance-active');
+
+  if (type === 'doors') {
+    revealHeroContent();
+    setTimeout(() => section.classList.add('entrance-done'), 3200);
+  }
+
+  if (type === 'confetti') {
+    const stage = section.querySelector('.confetti-stage');
+    if (stage && !confettiTriggered.has(section.id)) {
+      confettiTriggered.add(section.id);
+      const bursts = isMobile ? 2 : 3;
+      const perBurst = isMobile ? 35 : 55;
+      for (let b = 0; b < bursts; b++) {
+        setTimeout(() => spawnConfetti(stage, perBurst), b * 400);
+      }
+    }
+  }
+}
+
+const entranceIO = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      triggerEntrance(e.target);
+      entranceIO.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.25, rootMargin: '0px 0px -8% 0px' });
+
+document.querySelectorAll('[data-entrance]').forEach(section => {
+  entranceIO.observe(section);
+});
+
+// Trigger hero doors after first paint for smooth GPU compositing
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    const hero = document.getElementById('s-hero');
+    if (hero) triggerEntrance(hero);
+  });
+});
 
 // ── Glass cards ───────────────────────────────────────────────────────────────
 document.querySelectorAll(
