@@ -139,9 +139,11 @@ const CAP = isMobile ? 34 : 16;
 function loop(now) {
   requestAnimationFrame(loop);
   if (now - last < CAP) return;
+  const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
-  ft += 0.016;
-  sC += (sT - sC) * 0.045;
+  ft += dt;
+  sC += (sT - sC) * Math.min(1, dt * 2.7);
+  const step = dt * 60; // normalise per-frame speeds to 60fps
 
   bgMat.uniforms.time.value    = ft;
   bgMat.uniforms.scroll.value  = sC;
@@ -151,8 +153,8 @@ function loop(now) {
 
   const pa = pGeo.attributes.position.array;
   for (let i = 0; i < CNT; i++) {
-    pa[i*3]   += pVX[i];
-    pa[i*3+1] += pVY[i];
+    pa[i*3]   += pVX[i] * step;
+    pa[i*3+1] += pVY[i] * step;
     if (pa[i*3+1] >  8) pa[i*3+1] = -8;
     if (pa[i*3]   > 10) pa[i*3]   = -10;
     if (pa[i*3]   <-10) pa[i*3]   =  10;
@@ -160,8 +162,8 @@ function loop(now) {
   pGeo.attributes.position.needsUpdate = true;
 
   crescents.forEach(c => {
-    c.rotation.x += c.userData.rx;
-    c.rotation.y += c.userData.ry;
+    c.rotation.x += c.userData.rx * step;
+    c.rotation.y += c.userData.ry * step;
     c.rotation.z  = ft * 0.12 + c.userData.ph;
   });
 
@@ -236,7 +238,7 @@ function revealHeroContent() {
     setTimeout(() => {
       el.classList.add('visible');
       if (el.classList.contains('section-label')) spawnBurst(8);
-    }, 500 + i * 120);
+    }, 150 + i * 80);
   });
 }
 
@@ -256,13 +258,13 @@ function spawnConfetti(stage, count) {
       height: ${isRect ? size * 0.45 : size}px;
       background: ${CONFETTI_COLORS[i % CONFETTI_COLORS.length]};
       border-radius: ${isRect ? '1px' : '50%'};
-      animation-duration: ${2.2 + Math.random() * 2.8}s;
-      animation-delay: ${Math.random() * 1.2}s;
+      animation-duration: ${1.6 + Math.random() * 1.6}s;
+      animation-delay: ${Math.random() * 0.5}s;
       --spin: ${360 + Math.random() * 720}deg;
       --tumble: ${180 + Math.random() * 540}deg;
     `;
     stage.appendChild(el);
-    setTimeout(() => el.remove(), 5500);
+    setTimeout(() => el.remove(), 4000);
   }
 }
 
@@ -272,19 +274,19 @@ function triggerEntrance(section) {
 
   section.classList.add('entrance-active');
 
-  if (type === 'doors') {
+  if (type === 'doors' || type === 'float') {
     revealHeroContent();
-    setTimeout(() => section.classList.add('entrance-done'), 3200);
+    if (type === 'doors') setTimeout(() => section.classList.add('entrance-done'), 3200);
   }
 
   if (type === 'confetti') {
     const stage = section.querySelector('.confetti-stage');
     if (stage && !confettiTriggered.has(section.id)) {
       confettiTriggered.add(section.id);
-      const bursts = isMobile ? 2 : 3;
-      const perBurst = isMobile ? 35 : 55;
+      const bursts = isMobile ? 1 : 2;
+      const perBurst = isMobile ? 26 : 42;
       for (let b = 0; b < bursts; b++) {
-        setTimeout(() => spawnConfetti(stage, perBurst), b * 400);
+        setTimeout(() => spawnConfetti(stage, perBurst), b * 350);
       }
     }
   }
@@ -310,6 +312,26 @@ requestAnimationFrame(() => {
     if (hero) triggerEntrance(hero);
   });
 });
+
+// ── Pointer parallax tilt for 3D scenes (desktop only) ───────────────────────
+if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+  const tiltTargets = document.querySelectorAll('.scene-3d');
+  let tiltQueued = false;
+  window.addEventListener('pointermove', (e) => {
+    if (tiltQueued) return;
+    tiltQueued = true;
+    const px = e.clientX, py = e.clientY;
+    requestAnimationFrame(() => {
+      tiltQueued = false;
+      const rx = ((py / window.innerHeight) - 0.5) * -8;
+      const ry = ((px / window.innerWidth) - 0.5) * 10;
+      tiltTargets.forEach(el => {
+        el.style.setProperty('--tiltX', rx.toFixed(2) + 'deg');
+        el.style.setProperty('--tiltY', ry.toFixed(2) + 'deg');
+      });
+    });
+  }, { passive: true });
+}
 
 // ── Glass cards ───────────────────────────────────────────────────────────────
 document.querySelectorAll(
