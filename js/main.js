@@ -132,6 +132,8 @@ for (let i = 0; i < 3; i++) {
   crescents.push(m);
 }
 
+
+
 // ── Render loop ───────────────────────────────────────────────────────────────
 let ft=0, sT=0, sC=0, last=0;
 const CAP = isMobile ? 34 : 16;
@@ -167,6 +169,8 @@ function loop(now) {
     c.rotation.z  = ft * 0.12 + c.userData.ph;
   });
 
+
+
   renderer.render(scene, camera);
 }
 requestAnimationFrame(loop);
@@ -181,6 +185,7 @@ window.addEventListener('scroll', () => {
   const max = document.documentElement.scrollHeight - window.innerHeight;
   sT = max > 0 ? window.scrollY / max : 0;
 }, { passive: true });
+
 
 // ── Floating petals ───────────────────────────────────────────────────────────
 const pc   = document.getElementById('particles');
@@ -224,8 +229,12 @@ const io = new IntersectionObserver((entries) => {
       const inHero = e.target.closest('.s-hero');
       if (inHero && !inHero.classList.contains('entrance-active')) return;
       e.target.classList.add('visible');
-      io.unobserve(e.target);
       if (e.target.classList.contains('section-label')) spawnBurst(8);
+    } else {
+      const inHero = e.target.closest('.s-hero');
+      if (!inHero) {
+        e.target.classList.remove('visible');
+      }
     }
   });
 }, { threshold: 0.1, rootMargin: '0px 0px -4% 0px' });
@@ -269,8 +278,9 @@ function spawnConfetti(stage, count) {
 }
 
 function triggerEntrance(section) {
+  if (section.id === 's-hero') return;
   const type = section.dataset.entrance;
-  if (!type || section.classList.contains('entrance-active')) return;
+  if (!type) return;
 
   section.classList.add('entrance-active');
 
@@ -296,22 +306,25 @@ const entranceIO = new IntersectionObserver((entries) => {
   entries.forEach(e => {
     if (e.isIntersecting) {
       triggerEntrance(e.target);
-      entranceIO.unobserve(e.target);
+    } else {
+      if (e.target.id !== 's-hero') {
+        e.target.classList.remove('entrance-active');
+        confettiTriggered.delete(e.target.id);
+      }
     }
   });
-}, { threshold: 0.25, rootMargin: '0px 0px -8% 0px' });
+}, { threshold: 0.15, rootMargin: '0px 0px -4% 0px' });
 
 document.querySelectorAll('[data-entrance]').forEach(section => {
   entranceIO.observe(section);
 });
 
-// Trigger hero doors after first paint for smooth GPU compositing
-requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
-    const hero = document.getElementById('s-hero');
-    if (hero) triggerEntrance(hero);
-  });
-});
+// Set entrance-active immediately for hero and reveal content right away
+const heroImmediate = document.getElementById('s-hero');
+if (heroImmediate) {
+  heroImmediate.classList.add('entrance-active');
+  requestAnimationFrame(() => setTimeout(revealHeroContent, 300));
+}
 
 // ── Pointer parallax tilt for 3D scenes (desktop only) ───────────────────────
 if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
