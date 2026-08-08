@@ -232,7 +232,8 @@ const io = new IntersectionObserver((entries) => {
       if (e.target.classList.contains('section-label')) spawnBurst(8);
     } else {
       const inHero = e.target.closest('.s-hero');
-      if (!inHero) {
+      const inScratch = e.target.closest('.scratch-card-container');
+      if (!inHero && !inScratch) {
         e.target.classList.remove('visible');
       }
     }
@@ -252,30 +253,217 @@ function revealHeroContent() {
 }
 
 // ── Section entrance animations (doors / bloom / confetti) ───────────────────
-const CONFETTI_COLORS = ['#c8a96e', '#e8b8c8', '#fdf8e0', '#cc0000', '#f0d060', '#d4af70', '#e08080'];
+const CONFETTI_COLORS = ['#c8a96e', '#e8b8c8', '#fdf8e0', '#f0d060', '#d4af70', '#e08080', '#ff80ab', '#ffd54f'];
 const confettiTriggered = new Set();
 
-function spawnConfetti(stage, count) {
+// ── Physics-based canvas celebration ─────────────────────────────────────────
+let celebCanvas = null;
+let celebCtx = null;
+let celebParticles = [];
+let celebRAF = null;
+
+function initCelebCanvas() {
+  if (celebCanvas) return;
+  celebCanvas = document.createElement('canvas');
+  celebCanvas.style.cssText = `
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 9999;
+  `;
+  document.body.appendChild(celebCanvas);
+  celebCtx = celebCanvas.getContext('2d');
+  celebCanvas.width = window.innerWidth;
+  celebCanvas.height = window.innerHeight;
+  window.addEventListener('resize', () => {
+    celebCanvas.width = window.innerWidth;
+    celebCanvas.height = window.innerHeight;
+  });
+}
+
+function launchCelebration(originX, originY) {
+  initCelebCanvas();
+  celebParticles = [];
+
+  // Firework rockets that burst at top
+  const ROCKETS = 7;
+  for (let r = 0; r < ROCKETS; r++) {
+    const delay = r * 120;
+    setTimeout(() => {
+      const tx = originX + (Math.random() - 0.5) * window.innerWidth * 0.7;
+      const ty = window.innerHeight * (0.05 + Math.random() * 0.25);
+      launchRocket(originX, originY, tx, ty);
+    }, delay);
+  }
+
+  // Gold confetti ribbons
+  for (let i = 0; i < 80; i++) {
+    celebParticles.push({
+      type: 'confetti',
+      x: originX + (Math.random() - 0.5) * 60,
+      y: originY,
+      vx: (Math.random() - 0.5) * 8,
+      vy: -(4 + Math.random() * 8),
+      rot: Math.random() * Math.PI * 2,
+      rotV: (Math.random() - 0.5) * 0.3,
+      w: 5 + Math.random() * 6,
+      h: 3 + Math.random() * 3,
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      alpha: 1,
+      gravity: 0.18 + Math.random() * 0.12,
+      drag: 0.985,
+      life: 1,
+      lifeDecay: 0.004 + Math.random() * 0.003,
+      delay: Math.random() * 600
+    });
+  }
+
+  if (!celebRAF) celebLoop();
+}
+
+function launchRocket(sx, sy, tx, ty) {
+  const speed = 14 + Math.random() * 6;
+  const angle = Math.atan2(ty - sy, tx - sx);
+  const trail = { type: 'rocket', x: sx, y: sy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, tx, ty, alpha: 1 };
+  trail.onBurst = () => burstFirework(trail.x, trail.y);
+  celebParticles.push(trail);
+}
+
+function burstFirework(cx, cy) {
+  const count = 55 + Math.floor(Math.random() * 30);
+  const hue = Math.random() * 60 + 30; // gold–amber–rose range
   for (let i = 0; i < count; i++) {
-    const el = document.createElement('div');
-    el.className = 'confetti-piece';
-    const size = 6 + Math.random() * 8;
-    const isRect = Math.random() > 0.4;
-    el.style.cssText = `
-      left: ${Math.random() * 100}%;
-      width: ${isRect ? size : size * 0.6}px;
-      height: ${isRect ? size * 0.45 : size}px;
-      background: ${CONFETTI_COLORS[i % CONFETTI_COLORS.length]};
-      border-radius: ${isRect ? '1px' : '50%'};
-      animation-duration: ${1.6 + Math.random() * 1.6}s;
-      animation-delay: ${Math.random() * 0.5}s;
-      --spin: ${360 + Math.random() * 720}deg;
-      --tumble: ${180 + Math.random() * 540}deg;
-    `;
-    stage.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
+    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.3;
+    const speed = 2 + Math.random() * 5;
+    celebParticles.push({
+      type: 'spark',
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      lifeDecay: 0.016 + Math.random() * 0.012,
+      size: 1.5 + Math.random() * 2.5,
+      color: `hsl(${hue + (Math.random() - 0.5) * 30}, 95%, ${55 + Math.random() * 30}%)`,
+      gravity: 0.06,
+      drag: 0.97,
+      trail: [],
+      alpha: 1
+    });
+  }
+  // Gold glitter ring
+  for (let i = 0; i < 20; i++) {
+    const angle = (i / 20) * Math.PI * 2;
+    const speed = 1.2 + Math.random() * 1.5;
+    celebParticles.push({
+      type: 'glitter',
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1, lifeDecay: 0.022,
+      size: 3 + Math.random() * 3,
+      color: '#f5e090',
+      gravity: 0.04, drag: 0.96, alpha: 1
+    });
   }
 }
+
+function celebLoop() {
+  celebCtx.clearRect(0, 0, celebCanvas.width, celebCanvas.height);
+  const now = performance.now();
+
+  celebParticles = celebParticles.filter(p => {
+    if (p.delay && now < p.delay) return true; // wait for delay
+    if (p.type === 'rocket') {
+      const dx = p.tx - p.x, dy = p.ty - p.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 18) { p.onBurst(); return false; }
+      // Draw rocket tail
+      celebCtx.beginPath();
+      celebCtx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+      celebCtx.fillStyle = `rgba(245, 224, 144, ${p.alpha})`;
+      celebCtx.fill();
+      // Exhaust trail
+      for (let t = 0; t < 3; t++) {
+        celebCtx.beginPath();
+        celebCtx.arc(p.x - p.vx * t * 0.5, p.y - p.vy * t * 0.5, 1.5 - t * 0.4, 0, Math.PI * 2);
+        celebCtx.fillStyle = `rgba(200,169,110,${0.4 - t * 0.12})`;
+        celebCtx.fill();
+      }
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.12; // slight gravity on rocket
+      return true;
+    }
+    if (p.type === 'spark') {
+      // Draw spark with short trailing line
+      celebCtx.beginPath();
+      celebCtx.moveTo(p.x, p.y);
+      celebCtx.lineTo(p.x - p.vx * 3, p.y - p.vy * 3);
+      celebCtx.strokeStyle = p.color.replace(')', `, ${p.life * 0.8})`).replace('hsl', 'hsla');
+      celebCtx.lineWidth = p.size * 0.8;
+      celebCtx.lineCap = 'round';
+      celebCtx.stroke();
+      // dot at head
+      celebCtx.beginPath();
+      celebCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      celebCtx.fillStyle = p.color.replace(')', `, ${p.life})`).replace('hsl', 'hsla');
+      celebCtx.fill();
+      p.vx *= p.drag; p.vy *= p.drag;
+      p.vy += p.gravity;
+      p.x += p.vx; p.y += p.vy;
+      p.life -= p.lifeDecay;
+      return p.life > 0;
+    }
+    if (p.type === 'glitter') {
+      celebCtx.save();
+      celebCtx.translate(p.x, p.y);
+      celebCtx.globalAlpha = p.life;
+      celebCtx.fillStyle = p.color;
+      celebCtx.beginPath();
+      // Draw ✦ shape
+      const s = p.size;
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        celebCtx.moveTo(0, 0);
+        celebCtx.lineTo(Math.cos(a) * s * 2, Math.sin(a) * s * 2);
+        celebCtx.lineTo(Math.cos(a + 0.2) * s * 0.5, Math.sin(a + 0.2) * s * 0.5);
+      }
+      celebCtx.fill();
+      celebCtx.restore();
+      p.vx *= p.drag; p.vy *= p.drag;
+      p.vy += p.gravity;
+      p.x += p.vx; p.y += p.vy;
+      p.life -= p.lifeDecay;
+      return p.life > 0;
+    }
+    if (p.type === 'confetti') {
+      if (p.delay > now) return true;
+      celebCtx.save();
+      celebCtx.translate(p.x, p.y);
+      celebCtx.rotate(p.rot);
+      celebCtx.globalAlpha = p.life;
+      celebCtx.fillStyle = p.color;
+      celebCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      celebCtx.restore();
+      p.vx *= p.drag; p.vy *= p.drag;
+      p.vy += p.gravity;
+      p.vx += Math.sin(now * 0.003 + p.rot) * 0.12; // gentle sway
+      p.x += p.vx; p.y += p.vy;
+      p.rot += p.rotV;
+      p.life -= p.lifeDecay;
+      return p.life > 0 && p.y < window.innerHeight + 50;
+    }
+    return false;
+  });
+
+  if (celebParticles.length > 0) {
+    celebRAF = requestAnimationFrame(celebLoop);
+  } else {
+    celebRAF = null;
+    celebCtx.clearRect(0, 0, celebCanvas.width, celebCanvas.height);
+  }
+}
+
+function spawnBurst(count) { /* kept for compatibility – noop now */ }
+function spawnConfetti(stage, count) { /* kept for compatibility – noop now */ }
 
 function triggerEntrance(section) {
   if (section.id === 's-hero') return;
@@ -350,3 +538,217 @@ if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
 document.querySelectorAll(
   '.person-card,.event-card,.family-card,.host-card,.rel-block,.invite-text,.invite-venue-text,.dua-meaning'
 ).forEach(el => el.classList.add('glass'));
+
+// ── Interactive Scratch Card for Bride & Groom ────────────────────────────────
+function initScratchCard() {
+  const container = document.querySelector('.scratch-card-container');
+  const canvas = document.getElementById('scratch-canvas');
+  const autoBtn = document.getElementById('btn-auto-reveal');
+  const resetBtn = document.getElementById('btn-reset-scratch');
+  if (!canvas || !container) return;
+
+  const ctx = canvas.getContext('2d');
+  let isScratching = false;
+  let scratchedPercent = 0;
+  let isCleared = false;
+
+  function resizeCanvas() {
+    const rect = container.getBoundingClientRect();
+    const width = rect.width || container.offsetWidth || 340;
+    const height = rect.height || container.offsetHeight || 280;
+    canvas.width = width;
+    canvas.height = height;
+    drawFoil();
+  }
+
+  function drawFoil() {
+    if (isCleared) return;
+    ctx.globalCompositeOperation = 'source-over';
+    
+    // Royal Deep Maroon & Gold Foil Gradient Background
+    const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    grad.addColorStop(0, '#420a1c');
+    grad.addColorStop(0.3, '#2a0410');
+    grad.addColorStop(0.7, '#380816');
+    grad.addColorStop(1, '#1f020a');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Decorative Gold Lattice Lines
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.22)';
+    ctx.lineWidth = 1.2;
+    for (let i = -canvas.height; i < canvas.width + canvas.height; i += 24) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i + canvas.height, canvas.height);
+      ctx.stroke();
+    }
+    for (let i = canvas.width + canvas.height; i > -canvas.height; i -= 24) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i - canvas.height, canvas.height);
+      ctx.stroke();
+    }
+
+    // Outer Royal Gold Border Frame
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.85)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+    
+    ctx.strokeStyle = 'rgba(255, 225, 140, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(16, 16, canvas.width - 32, canvas.height - 32);
+
+    // Corner Ornaments
+    ctx.fillStyle = '#f5e090';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('❖', 22, 22);
+    ctx.fillText('❖', canvas.width - 22, 22);
+    ctx.fillText('❖', 22, canvas.height - 22);
+    ctx.fillText('❖', canvas.width - 22, canvas.height - 22);
+
+    // Center Royal Gold Wax Seal / Badge
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const badgeR = Math.min(80, canvas.width * 0.24);
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, badgeR, 0, Math.PI * 2);
+    const badgeGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, badgeR);
+    badgeGrad.addColorStop(0, '#2a0410');
+    badgeGrad.addColorStop(0.75, '#190209');
+    badgeGrad.addColorStop(1, '#4a0c20');
+    ctx.fillStyle = badgeGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#f5e090';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Inner Beaded Ring
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.6)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, badgeR - 6, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Center Badge Text - ONLY Scratch Here
+    ctx.fillStyle = '#f5e090';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 17px "Catamaran", sans-serif';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+    ctx.shadowBlur = 6;
+    ctx.fillText('✨ Scratch Here ✨', cx, cy);
+    ctx.shadowBlur = 0;
+  }
+
+  function scratch(x, y) {
+    if (isCleared) return;
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(x, y, 32, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Spawn glitter particle at scratch point
+    if (Math.random() < 0.35) {
+      spawnGlitter(x, y);
+    }
+
+    checkScratchProgress();
+  }
+
+  function spawnGlitter(x, y) {
+    const p = document.createElement('div');
+    p.className = 'scratch-glitter';
+    p.style.left = (x + (Math.random() - 0.5) * 16) + 'px';
+    p.style.top = (y + (Math.random() - 0.5) * 16) + 'px';
+    p.textContent = ['✦', '✨', '🌸', '✧'][Math.floor(Math.random() * 4)];
+    container.appendChild(p);
+    setTimeout(() => p.remove(), 800);
+  }
+
+  function checkScratchProgress() {
+    const sampleStep = 20;
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = imgData.data;
+    let transparentCount = 0;
+    let totalSamples = 0;
+
+    for (let i = 3; i < pixels.length; i += 4 * sampleStep) {
+      totalSamples++;
+      if (pixels[i] < 128) {
+        transparentCount++;
+      }
+    }
+
+    scratchedPercent = transparentCount / totalSamples;
+    // Auto-reveal at just 30% scratched
+    if (scratchedPercent > 0.30 && !isCleared) {
+      revealAll();
+    }
+  }
+
+  function revealAll() {
+    if (isCleared) return;
+    isCleared = true;
+
+    // Smooth canvas fade-out
+    canvas.style.transition = 'opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1), transform 0.9s cubic-bezier(0.22, 1, 0.36, 1)';
+    canvas.style.opacity = '0';
+    canvas.style.transform = 'scale(1.04)';
+    setTimeout(() => { canvas.style.display = 'none'; }, 950);
+
+    if (autoBtn) autoBtn.style.display = 'none';
+    if (resetBtn) resetBtn.style.display = 'inline-block';
+
+    // Get screen position of the scratch card centre
+    const rect = container.getBoundingClientRect();
+    const originX = rect.left + rect.width / 2;
+    const originY = rect.top + rect.height / 2;
+
+    // Launch the real physics celebration after canvas fades
+    setTimeout(() => launchCelebration(originX, originY), 400);
+  }
+
+  function resetScratch() {
+    isCleared = false;
+    canvas.style.display = 'block';
+    canvas.style.transition = 'none';
+    canvas.style.transform = 'none';
+    canvas.style.opacity = '1';
+    resizeCanvas();
+    if (autoBtn) autoBtn.style.display = 'inline-block';
+    if (resetBtn) resetBtn.style.display = 'none';
+  }
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  }
+
+  canvas.addEventListener('mousedown', (e) => { isScratching = true; const p = getPos(e); scratch(p.x, p.y); });
+  window.addEventListener('mousemove', (e) => { if (isScratching) { const p = getPos(e); scratch(p.x, p.y); } });
+  window.addEventListener('mouseup', () => { isScratching = false; });
+
+  canvas.addEventListener('touchstart', (e) => { isScratching = true; const p = getPos(e); scratch(p.x, p.y); }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => { if (isScratching) { const p = getPos(e); scratch(p.x, p.y); } }, { passive: true });
+  canvas.addEventListener('touchend', () => { isScratching = false; });
+
+  if (autoBtn) autoBtn.addEventListener('click', revealAll);
+  if (resetBtn) resetBtn.addEventListener('click', resetScratch);
+
+  window.addEventListener('resize', resizeCanvas);
+  setTimeout(resizeCanvas, 300);
+}
+
+document.addEventListener('DOMContentLoaded', initScratchCard);
+window.addEventListener('load', initScratchCard);
+setTimeout(initScratchCard, 300);
+setTimeout(initScratchCard, 800);

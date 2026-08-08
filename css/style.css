@@ -14,7 +14,7 @@ body{font-family:'Catamaran',sans-serif;background:#07000d;color:#fdf8e0;overflo
 .section+.section::before { display: none; }
 
 /* ══ SCROLL REVEAL — ultra-premium 3D ══ */
-[class*="reveal"],.section-label{opacity:0;will-change:transform,opacity}
+[class*="reveal"]:not(.scratch-reveal-content),.section-label{opacity:0;will-change:transform,opacity}
 .reveal          {transform:translateY(60px) rotateX(22deg) scale(.9)}
 .reveal-left     {transform:translateX(-70px) rotateY(28deg) scale(.9)}
 .reveal-right    {transform:translateX(70px) rotateY(-28deg) scale(.9)}
@@ -185,10 +185,211 @@ body{font-family:'Catamaran',sans-serif;background:#07000d;color:#fdf8e0;overflo
   pointer-events: none;
 }
 
+/* ══ SCRATCH CARD FEATURE ══ */
+.scratch-card-container {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  min-height: 280px;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.8),
+    0 0 0 1.5px rgba(200, 169, 110, 0.5),
+    inset 0 0 0 0 transparent;
+  z-index: 3;
+}
+
+.scratch-reveal-content {
+  position: relative;
+  width: 100%;
+  padding: 14px 14px 18px;
+  background: linear-gradient(145deg, #120524 0%, #0b0118 45%, #1a0730 100%);
+  border-radius: 24px;
+  border: 1.5px solid rgba(200, 169, 110, 0.5);
+  box-shadow: inset 0 0 50px rgba(100, 50, 150, 0.15), inset 0 0 20px rgba(200, 169, 110, 0.08);
+  overflow: hidden;
+}
+
+.scratch-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  cursor: pointer;
+  touch-action: none;
+  border-radius: 24px;
+  transition: opacity 0.5s ease;
+}
+
+.scratch-glitter {
+  position: absolute;
+  pointer-events: none;
+  font-size: .9rem;
+  color: #f5e090;
+  z-index: 12;
+  animation: glitterPop 0.8s ease-out forwards;
+}
+@keyframes glitterPop {
+  0% { opacity: 1; transform: scale(0.4) translateY(0); }
+  100% { opacity: 0; transform: scale(1.4) translateY(-30px) rotate(60deg); }
+}
+
+/* ══ MANDALA ISLAMIC CARD STYLES ══ */
+
+/* Absolute-position SVG border so it covers the whole card */
+.mandala-border-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  animation: rotateSlow 30s linear infinite;
+}
+@keyframes rotateSlow {
+  0%  { filter: drop-shadow(0 0 4px rgba(200,169,110,.3)); }
+  50% { filter: drop-shadow(0 0 10px rgba(200,169,110,.7)); }
+  100%{ filter: drop-shadow(0 0 4px rgba(200,169,110,.3)); }
+}
+
+.mnd-bism {
+  font-family: 'Amiri', serif;
+  direction: rtl;
+  font-size: clamp(0.8rem, 3.5vw, 1.05rem);
+  color: #f5e090;
+  text-align: center;
+  margin: 6px 0 2px;
+  text-shadow: 0 0 18px rgba(200,169,110,.75), 0 2px 6px rgba(0,0,0,.9);
+  position: relative; z-index: 1;
+}
+
+.mnd-crescent {
+  text-align: center;
+  font-size: 1.1rem;
+  color: #c8a96e;
+  letter-spacing: 6px;
+  margin-bottom: 8px;
+  text-shadow: 0 0 10px rgba(200,169,110,.5);
+  position: relative; z-index: 1;
+}
+
+/* Each person block — centered, stacked */
+.mnd-person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 10px 16px;
+  position: relative; z-index: 1;
+  width: 100%;
+}
+
+.mnd-role-badge {
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  padding: 3px 14px;
+  border-radius: 100px;
+  margin-bottom: 2px;
+}
+.groom-badge {
+  color: #c8a96e;
+  background: rgba(200,169,110,.12);
+  border: 1px solid rgba(200,169,110,.45);
+}
+.bride-badge {
+  color: #e8b8c8;
+  background: rgba(220,140,170,.12);
+  border: 1px solid rgba(220,140,170,.45);
+}
+
+.mnd-name {
+  font-family: 'Noto Serif Tamil', serif;
+  font-size: clamp(1.15rem, 5vw, 1.55rem);
+  font-weight: 900;
+  line-height: 1.3;
+}
+.groom-name-txt {
+  color: #f5e090;
+  text-shadow: 0 0 22px rgba(200,169,110,.6), 0 2px 5px rgba(0,0,0,.95);
+}
+.bride-name-txt {
+  color: #ffd4e4;
+  text-shadow: 0 0 22px rgba(220,140,170,.6), 0 2px 5px rgba(0,0,0,.95);
+}
+
+.mnd-qual {
+  font-size: 0.65rem;
+  color: rgba(253,248,224,.88);
+  line-height: 1.5;
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0,0,0,.95);
+}
+
+.mnd-sep {
+  width: 70%;
+  max-width: 160px;
+  height: 14px;
+  margin: 2px auto;
+}
+.mnd-sep svg { width: 100%; height: 100%; }
+
+.mnd-parents {
+  font-size: 0.62rem;
+  color: rgba(253,248,224,.9);
+  line-height: 1.7;
+  font-weight: 500;
+  text-shadow: 0 1px 4px rgba(0,0,0,.9);
+}
+
+/* Centre mandala divider */
+.mnd-divider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  position: relative; z-index: 1;
+  width: 100%;
+}
+.mnd-divider svg {
+  width: clamp(180px, 60%, 260px);
+  height: 48px;
+  animation: rotateSlow2 8s ease-in-out infinite alternate;
+}
+@keyframes rotateSlow2 {
+  0% { filter: drop-shadow(0 0 3px rgba(200,169,110,.4)); }
+  100% { filter: drop-shadow(0 0 10px rgba(200,169,110,.9)); }
+}
+.mnd-heart {
+  font-size: 1.5rem;
+  color: #cc0000;
+  text-shadow: 0 0 14px rgba(220,0,0,.8);
+  animation: heartThump 0.8s ease-in-out infinite alternate;
+  margin-top: -2px;
+}
+
+/* Bottom ornament */
+.mnd-bottom-orn {
+  text-align: center;
+  color: #c8a96e;
+  font-size: 0.75rem;
+  letter-spacing: 8px;
+  margin-top: 6px;
+  opacity: 0.85;
+  text-shadow: 0 0 10px rgba(200,169,110,.5);
+  position: relative; z-index: 1;
+}
+
+
 /* ══ SPLIT LAYOUT ══ */
 .s-couple { gap: 20px; }
 .s-couple > .section-label,
-.s-couple > .split-wrap,
+.s-couple > .scratch-card-container,
 .s-couple > .rose-row,
 .s-couple > .lantern { position: relative; z-index: 2; }
 
@@ -213,6 +414,12 @@ body{font-family:'Catamaran',sans-serif;background:#07000d;color:#fdf8e0;overflo
   text-align: center;
   gap: 6px;
   border-radius: 20px 0 0 20px;
+  opacity: 1 !important;
+}
+
+.split-degree, .split-family {
+  color: rgba(253, 248, 224, 0.92) !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 .split-bride {
   border-radius: 0 20px 20px 0;
@@ -973,3 +1180,52 @@ body{font-family:'Catamaran',sans-serif;background:#07000d;color:#fdf8e0;overflo
 .connect-path{stroke-dasharray:420;stroke-dashoffset:420}
 .s-family.entrance-active .connect-path{animation:pathDraw 1.8s ease-out .2s forwards}
 @keyframes pathDraw{to{stroke-dashoffset:0}}
+
+/* ══ CELEBRATION EFFECTS ══ */
+.confetti-piece {
+  position: absolute;
+  top: -10px;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 1;
+  animation-name: confettiFall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(0) rotate(0deg) rotateX(0deg);
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(120vh) rotate(var(--spin)) rotateX(var(--tumble));
+    opacity: 0;
+  }
+}
+
+.burst-particle {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 1;
+  will-change: transform, opacity;
+}
+
+@keyframes fireworkBurst {
+  0% {
+    transform: translate(0, 0) scale(0) rotate(0deg);
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx), var(--ty)) scale(1.5) rotate(var(--r));
+    opacity: 0;
+  }
+}
